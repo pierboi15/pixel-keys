@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pixel Keys">
+<meta name="theme-color" content="#0e0b1f">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" href="icon.png">
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); background: #0e0b1f; }
+body { margin: 0; }
+[hidden] { display: none !important; }
+</style>
+<title>Pixel Keys</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+<style>
+/* Layout: one four-lane screen inside an arcade-cabinet bezel; menus are overlays on the screen. Single dark arcade look by choice. */
+:root {
+  --screen: #1d1640;    /* deep night violet */
+  --lane: #2c2160;
+  --ink: #fff1e8;
+  --dim: #a69bd1;
+  --yellow: #ffec27;
+  --pink: #ff4fa3;
+  --cyan: #29e0ff;
+  --shell: #0e0b1f;
+  --font: "Press Start 2P", ui-monospace, "Courier New", monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  background: var(--shell); color: var(--ink); font-family: var(--font);
+  overflow: hidden; touch-action: none;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+  display: flex; justify-content: center; padding-inline: 16px;
+}
+#console { height: 100%; width: min(460px, 100%); display: flex; flex-direction: column; padding-block: 10px; gap: 8px; }
+#brand { display: flex; justify-content: space-between; align-items: baseline; font-size: 10px; color: var(--dim); letter-spacing: .08em; }
+#brand span { color: var(--pink); }
+#brand b { color: var(--yellow); font-weight: 400; }
+#screen {
+  position: relative; flex: 1; min-height: 0; border-radius: 8px; overflow: hidden;
+  background: var(--screen); border: 8px solid #241a4a;
+  box-shadow: 0 0 0 2px #3b2d78, 0 0 24px rgba(255, 79, 163, .25);
+}
+canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+#screen::after { /* CRT scanlines */
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(0,0,0,.22) 0 1px, transparent 1px 3px);
+}
+.overlay {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 18px; padding: 16px; text-align: center; background: rgba(29, 22, 64, .94); color: var(--ink);
+}
+.overlay h1 { margin: 0; font-size: clamp(22px, 7vw, 32px); line-height: 1.3; letter-spacing: .04em; color: var(--yellow); text-shadow: 3px 3px 0 var(--pink); text-wrap: balance; }
+.overlay p { margin: 0; font-size: 10px; line-height: 1.9; max-width: 30ch; color: var(--dim); }
+.overlay .big { font-size: 34px; color: var(--cyan); }
+.overlay .row { display: flex; gap: 24px; font-size: 10px; color: var(--dim); }
+.overlay .row b { display: block; font-size: 18px; color: var(--ink); font-weight: 400; margin-top: 6px; }
+.btn {
+  font: inherit; font-size: 14px; color: var(--screen); background: var(--yellow); border: 0;
+  padding: 14px 22px; cursor: pointer; box-shadow: 4px 4px 0 var(--pink);
+}
+.modes { display: flex; flex-direction: column; gap: 14px; width: min(220px, 100%); }
+.modes .btn { width: 100%; }
+.mode[data-mode="easy"] { background: #00e436; }
+.mode[data-mode="hard"] { background: #ff4fa3; color: var(--ink); box-shadow: 4px 4px 0 #29e0ff; }
+.btn.alt { background: var(--lane); color: var(--ink); }
+.mode small { display: block; font-size: 8px; margin-top: 6px; opacity: .8; }
+.btn:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--pink); }
+.btn:focus-visible { outline: 3px solid var(--cyan); outline-offset: 3px; }
+.blink { animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .blink { animation: none; } }
+#keys { font-size: 9px; color: var(--dim); text-align: center; }
+@media (hover: none) { #keys { display: none; } }
+</style>
+</head>
+<body>
+
+<div id="console">
+  <div id="brand"><span>PIXEL KEYS</span><b id="bestTop">BEST 0</b></div>
+  <div id="screen">
+    <canvas id="c"></canvas>
+    <div class="overlay" id="menu">
+      <h1>PIXEL<br>KEYS</h1>
+      <p>Tap the glowing tiles from the bottom up. Miss one, tap a blank square, or tap out of order and it's over.</p>
+      <p>Every tile is a note of the song. Hold the long tiles.</p>
+      <div class="modes">
+        <button class="btn mode" data-mode="easy" id="mEasy">EASY</button>
+        <button class="btn mode" data-mode="medium" id="mMed">MEDIUM</button>
+        <button class="btn mode" data-mode="hard" id="mHard">HARD</button>
+      </div>
+      <p class="blink">SOUND ON</p>
+    </div>
+    <div class="overlay" id="over" hidden>
+      <h1 id="overTitle">GAME OVER</h1>
+      <div class="big" id="overScore">0</div>
+      <div class="row"><span>BEST<b id="overBest">0</b></span><span>MODE<b id="overMode">MED</b></span><span>BPM<b id="overSpeed">0</b></span></div>
+      <p id="overWhy"></p>
+      <div class="modes">
+        <button class="btn" id="again">RETRY</button>
+        <button class="btn alt" id="toMenu">MODES</button>
+      </div>
+    </div>
+  </div>
+  <div id="keys">KEYBOARD: D F J K</div>
+</div>
+
+<script>
+(() => {
+  const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+  const $ = id => document.getElementById(id);
+  const C = { bg: '#1d1640', lane: '#2c2160', ink: '#fff1e8', dim: '#a69bd1', yellow: '#ffec27', miss: '#ff004d', hit: '#3b2d78' };
+  // each lane has its own tile color: [body, highlight, shadow]
+  const LANE_COL = [['#ff4fa3', '#ffa8d2', '#a3235f'], ['#ffa300', '#ffd27a', '#a85f00'], ['#00e436', '#8cffaa', '#008a25'], ['#29e0ff', '#a6f2ff', '#1279a8']];
+  const LANES = 4;
+  let W = 0, H = 0, dpr = 1, laneW = 0, rowH = 0;
+
+  function resize() {
+    const r = cv.getBoundingClientRect();
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+    W = r.width; H = r.height; laneW = W / LANES; rowH = H / 4;
+  }
+  addEventListener('resize', resize);
+
+  // ---------- sound: square-wave chiptune ----------
+  let ac = null;
+  function audio() {
+    if (!ac) { const A = window.AudioContext || window.webkitAudioContext; if (A) ac = new A(); }
+    if (ac && ac.state === 'suspended') ac.resume();
+  }
+  function tone(freq, dur = 0.18, type = 'square', vol = 0.08) {
+    if (!ac) return null;
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + dur);
+    o.connect(g).connect(ac.destination); o.start(); o.stop(ac.currentTime + dur + 0.02);
+    return { o, g };
+  }
+  // each lane color has its own instrument
+  //   pink = square lead, orange = buzzy saw brass, green = soft triangle flute, blue = chime bell
+  function laneTone(lane, freq, dur = 0.2) {
+    if (!ac) return;
+    const t0 = ac.currentTime, out = ac.createGain();
+    out.connect(ac.destination);
+    const osc = (type, f, vol, d = dur) => {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = type; o.frequency.setValueAtTime(f, t0);
+      g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+      o.connect(g).connect(out); o.start(t0); o.stop(t0 + d + 0.02);
+      return o;
+    };
+    if (lane === 0) { osc('square', freq, 0.07); }
+    else if (lane === 1) { osc('sawtooth', freq, 0.06); osc('sawtooth', freq * 1.006, 0.04); }
+    else if (lane === 2) {
+      const o = osc('triangle', freq, 0.16);
+      const lfo = ac.createOscillator(), lg = ac.createGain();
+      lfo.frequency.value = 7; lg.gain.value = freq * 0.012; lfo.connect(lg).connect(o.frequency);
+      lfo.start(t0); lfo.stop(t0 + dur + 0.02);
+    }
+    else { osc('sine', freq * 2, 0.12, Math.max(dur, 0.35)); osc('sine', freq * 5.4, 0.03, 0.12); osc('square', freq, 0.015, 0.05); }
+  }
+  function held(freq) {
+    if (!ac) return null;
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = 'square'; o.frequency.value = freq; g.gain.value = 0.06;
+    o.connect(g).connect(ac.destination); o.start();
+    return { stop() { try { g.gain.setValueAtTime(g.gain.value, ac.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + 0.08); o.stop(ac.currentTime + 0.1); } catch (_) {} } };
+  }
+  const N = n => 440 * Math.pow(2, (n - 69) / 12);
+
+  // Original chiptune loop: A minor, i-VI-III-VII (Am F C G), 16th-note grid.
+  // Tempo follows the game speed, so the song races as the tiles do.
+  const PROG = [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]]; // chord tones (MIDI)
+  const BASS = [45, 41, 36, 43];
+  const LEAD = [ // one bar per chord, 16 steps, 0 = rest
+    [76,0,79,0, 81,0,79,76, 0,74,76,0, 72,0,74,0],
+    [77,0,76,0, 72,0,69,0, 72,74,0,76, 0,77,0,0],
+    [79,0,76,0, 72,0,76,79, 0,84,0,83, 79,0,76,0],
+    [74,0,79,0, 83,0,81,79, 0,78,79,0, 74,0,71,0]
+  ];
+  const music = { on: false, step: 0, next: 0, timer: null, pulse: 0, noise: null, bus: null };
+  function makeNoise() {
+    const b = ac.createBuffer(1, ac.sampleRate * 0.3, ac.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    return b;
+  }
+  function voice(type, freq, t0, dur, vol, slideTo) {
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g).connect(music.bus); o.start(t0); o.stop(t0 + dur + 0.02);
+  }
+  function hit(t0, dur, vol, hp) {
+    const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+    s.buffer = music.noise; f.type = 'highpass'; f.frequency.value = hp;
+    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    s.connect(f).connect(g).connect(music.bus); s.start(t0); s.stop(t0 + dur + 0.02);
+  }
+  const MODES = {
+    easy:   { label: 'EASY', bpm0: 96,  rate: 0.18, max: 150, pDouble: 0.05, pLong: 0.14, burst: false },
+    medium: { label: 'MED',  bpm0: 120, rate: 0.32, max: 190, pDouble: 0.16, pLong: 0.18, burst: false },
+    hard:   { label: 'HARD', bpm0: 150, rate: 0.45, max: 240, pDouble: 0.30, pLong: 0.22, burst: true }
+  };
+  let mode = 'medium', curBpm = 120;
+  function bpm() { return curBpm; }
+  function targetBpm() {
+    const m = MODES[mode];
+    const b = Math.min(m.max, m.bpm0 + score * m.rate);
+    return b * (m.burst && score > 150 && Math.floor(score / 40) % 3 === 2 ? 1.12 : 1);
+  }
+  const rowsPerSec = () => curBpm / 60 * 2; // one row = one eighth note
+  // the melody note that belongs to song row r
+  function songNote(r) {
+    const step = (r * 2) % 64, bar = Math.floor(step / 16), st = step % 16;
+    return LEAD[bar][st] || LEAD[bar][st + 1] || PROG[bar][r % 3] + 24;
+  }
+  function scheduleStep(i, t0, sixteenth) {
+    const bar = Math.floor(i / 16) % 4, st = i % 16, chord = PROG[bar];
+    const intense = state === 'play' && score > 60;
+    // drums
+    if (st % 4 === 0) voice('sine', 150, t0, 0.12, 0.5, 40);                          // kick
+    if (intense && st % 8 === 6) voice('sine', 150, t0, 0.1, 0.35, 45);
+    if (st % 8 === 4) { hit(t0, 0.12, 0.22, 1500); voice('triangle', 220, t0, 0.06, 0.15, 120); } // snare
+    if (st % 2 === 0 || intense) hit(t0, 0.03, st % 4 === 2 ? 0.08 : 0.04, 7000);       // hats
+    // bass: driving octave eighths
+    if (st % 2 === 0) voice('triangle', N(BASS[bar] + (st % 4 === 2 ? 12 : 0)), t0, sixteenth * 1.8, 0.22);
+    // arpeggio
+    const arp = chord[st % 3] + 12 + (st % 6 >= 3 ? 12 : 0);
+    voice('square', N(arp), t0, sixteenth * 0.9, 0.025);
+    // lead melody
+    if (st % 4 === 0) setTimeout(() => { music.pulse = 1; }, Math.max(0, (t0 - ac.currentTime) * 1000));
+  }
+  function musicStart() {
+    if (!ac) return;
+    if (!music.bus) { music.bus = ac.createGain(); music.bus.gain.value = 0.55; music.bus.connect(ac.destination); music.noise = makeNoise(); }
+    music.on = true; music.step = -1;
+  }
+  // called every frame while playing: schedules song steps from the scroll position, so beats line up with tile rows
+  function musicTick() {
+    if (!music.on || !ac) return;
+    const spr = 1 / rowsPerSec(), look = 0.1 / spr;
+    const until = Math.floor((scroll + look) * 2);
+    while (music.step < until) {
+      music.step++;
+      const t0 = ac.currentTime + Math.max(0, (music.step / 2 - scroll) * spr);
+      scheduleStep(music.step, t0, spr / 2);
+    }
+  }
+  function musicStop() { music.on = false; }
+  // Für Elise (Beethoven, public domain), opening theme as MIDI notes
+  const MELODY = [76,75,76,75,76,71,74,72,69, 60,64,69,71, 64,68,71,72, 64,76,75,76,75,76,71,74,72,69, 60,64,69,71, 64,72,71,69,
+                  71,72,74,76, 67,77,76,74, 65,76,74,72, 64,74,72,71, 64,76,75,76,75,76,71,74,72,69];
+  let noteIx = 0;
+  const nextNote = () => {
+    if (music.on) { const ch = PROG[Math.floor(music.step / 16) % 4]; return ch[noteIx++ % 3] + 24; }
+    return MELODY[noteIx++ % MELODY.length];
+  };
+
+  // ---------- state ----------
+  let tiles = [], nextRow = 0, scroll = 0, speed = 0, score = 0, state = 'menu', lastLane = -1;
+  let failInfo = null, flash = 0, startT = 0, popups = [];
+  let best = 0;
+  function loadBest() {
+    best = 0;
+    try { best = +localStorage.getItem('pixel-keys-best-' + mode) || 0; } catch (_) {}
+    $('bestTop').textContent = MODES[mode].label + ' BEST ' + best;
+  }
+  loadBest();
+
+  const laneFor = n => n <= 72 ? 0 : n <= 76 ? 1 : n <= 79 ? 2 : 3;
+  function genRow() {
+    const r = nextRow, m = MODES[mode];
+    const lvl = score + tiles.length;
+    const roll = Math.random();
+    const pDouble = Math.min(m.pDouble, 0.03 + lvl * 0.0012);
+    const pLong = Math.min(m.pLong, 0.06 + lvl * 0.0006);
+    const note = songNote(r);
+    // higher notes sit further right, like a keyboard
+    let a = laneFor(note);
+    if (a === lastLane && Math.random() < 0.5) a = (a + (Math.random() < 0.5 ? 1 : 3)) % 4;
+    if (r > 2 && roll < pDouble) {
+      let b; do { b = Math.floor(Math.random() * LANES); } while (b === a);
+      const ch = PROG[Math.floor(((r * 2) % 64) / 16)];
+      tiles.push({ lane: a, row: r, len: 1, note }, { lane: b, row: r, len: 1, note: ch[0] + 12 });
+      lastLane = a; nextRow += 1;
+    } else if (r > 2 && roll < pDouble + pLong) {
+      const len = 2 + Math.floor(Math.random() * (lvl > 120 ? 3 : 2));
+      tiles.push({ lane: a, row: r, len, note }); lastLane = a; nextRow += len;
+    } else {
+      tiles.push({ lane: a, row: r, len: 1, note }); lastLane = a; nextRow += 1;
+    }
+  }
+
+  // row r occupies the screen band whose top is at yTop(r)
+  const yTop = r => H - (r + 2) * rowH + scroll * rowH;
+  const tileTop = t => yTop(t.row + t.len - 1);
+  const tileBottom = t => yTop(t.row) + rowH;
+
+  function reset() {
+    tiles = []; nextRow = 0; scroll = 0; score = 0; noteIx = 0; lastLane = -1; failInfo = null; popups = [];
+    curBpm = MODES[mode].bpm0; state = 'ready';
+    while (nextRow < 12) genRow();
+    tiles[0].start = true;
+    for (const t of tiles) if (t.row === 0 && t !== tiles[0]) t.start = false;
+  }
+
+  function lowestPendingRow() {
+    let m = Infinity;
+    for (const t of tiles) if (!t.hit) m = Math.min(m, t.row);
+    return m;
+  }
+
+  function fail(why, lane, y, tile) {
+    state = 'fail';
+    failInfo = { why, lane, y, tile, t: 0 };
+    musicStop();
+    for (const t of tiles) if (t.sound) { t.sound.stop(); t.sound = null; }
+    tone(110, 0.5, 'sawtooth', 0.1); setTimeout(() => tone(82, 0.6, 'sawtooth', 0.1), 120);
+    setTimeout(showOver, 900);
+  }
+  function showOver() {
+    const isNew = score > best && score > 0;
+    if (score > best) { best = score; try { localStorage.setItem('pixel-keys-best-' + mode, best); } catch (_) {} }
+    $('bestTop').textContent = MODES[mode].label + ' BEST ' + best;
+    $('overMode').textContent = MODES[mode].label;
+    $('overTitle').textContent = isNew ? 'NEW BEST!' : 'GAME OVER';
+    $('overScore').textContent = score;
+    $('overBest').textContent = best;
+    $('overSpeed').textContent = Math.round(curBpm);
+    $('overWhy').textContent = failInfo ? failInfo.why : '';
+    $('over').hidden = false;
+    state = 'over';
+  }
+
+  function press(lane, y, id) {
+    if (state !== 'ready' && state !== 'play') return;
+    const low = lowestPendingRow();
+    let hitTile = null;
+    for (const t of tiles) {
+      if (t.hit || t.lane !== lane) continue;
+      if (y >= tileTop(t) - 4 && y <= tileBottom(t) + 6) { hitTile = t; break; }
+    }
+    if (!hitTile) {
+      // tapping a blank square on the lowest pending row or anything on-screen is a miss
+      return fail('You tapped an empty square.', lane, y, null);
+    }
+    if (hitTile.row !== low) return fail('Wrong order. Always tap the lowest tile first.', lane, y, hitTile);
+    if (state === 'ready') { state = 'play'; curBpm = targetBpm(); musicStart(); }
+    hitTile.hit = true; hitTile.hitAt = performance.now();
+    const note = hitTile.note;
+    if (hitTile.len > 1) {
+      hitTile.holding = id; hitTile.holdStart = scroll; hitTile.progress = 0;
+      hitTile.sound = null; hitTile.pulseIx = 0; hitTile.pulseNote = note; hitTile.nextPulse = 0;
+      score += 1;
+    } else {
+      // two tiles on the same row get a harmony note
+      const twin = tiles.some(o => o !== hitTile && o.row === hitTile.row);
+      laneTone(hitTile.lane, N(note), Math.min(0.3, 60 / curBpm / 2));
+      score += 1;
+    }
+    popups.push({ x: lane * laneW + laneW / 2, y: tileBottom(hitTile) - rowH / 2, t: 0, txt: '+1' });
+  }
+  function release(id) {
+    for (const t of tiles) if (t.holding === id) {
+      t.holding = null;
+      if (t.sound) { t.sound.stop(); t.sound = null; }
+      if (!t.done) { t.done = true; const bonus = Math.floor(t.progress * (t.len - 1)); if (bonus > 0) { score += bonus; popups.push({ x: t.lane * laneW + laneW / 2, y: H * 0.6, t: 0, txt: '+' + bonus }); } }
+    }
+  }
+
+  // ---------- input ----------
+  cv.addEventListener('pointerdown', e => {
+    e.preventDefault(); audio();
+    const r = cv.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    try { cv.setPointerCapture(e.pointerId); } catch (_) {}
+    press(Math.max(0, Math.min(LANES - 1, Math.floor(x / laneW))), y, 'p' + e.pointerId);
+  });
+  const up = e => release('p' + e.pointerId);
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up); cv.addEventListener('lostpointercapture', up);
+  cv.addEventListener('contextmenu', e => e.preventDefault());
+  document.addEventListener('gesturestart', e => e.preventDefault());
+  document.addEventListener('dblclick', e => e.preventDefault());
+
+  const KEYMAP = { d: 0, f: 1, j: 2, k: 3 };
+  const keyDown = {};
+  addEventListener('keydown', e => {
+    const k = e.key.toLowerCase();
+    if (k in KEYMAP) {
+      e.preventDefault(); if (keyDown[k]) return; keyDown[k] = true; audio();
+      const lane = KEYMAP[k];
+      // keyboard taps the lowest pending tile in that lane
+      let target = null;
+      for (const t of tiles) if (!t.hit && t.lane === lane && (!target || t.row < target.row)) target = t;
+      const low = lowestPendingRow();
+      const y = target && target.row === low ? (tileTop(target) + tileBottom(target)) / 2 : -9999;
+      if (y === -9999) {
+        if (target) return fail('Wrong order. Always tap the lowest tile first.', lane, (tileTop(target) + tileBottom(target)) / 2, target);
+        return fail('You pressed an empty lane.', lane, H - rowH * 1.5, null);
+      }
+      press(lane, y, 'k' + k);
+    } else if ((k === ' ' || k === 'enter') && state === 'over') { e.preventDefault(); start(); }
+  });
+  addEventListener('keyup', e => { const k = e.key.toLowerCase(); if (k in KEYMAP) { keyDown[k] = false; release('k' + k); } });
+
+  function start() { audio(); $('menu').hidden = true; $('over').hidden = true; reset(); }
+  for (const b of document.querySelectorAll('.mode')) b.addEventListener('click', () => { mode = b.dataset.mode; loadBest(); start(); });
+  $('toMenu').addEventListener('click', () => { $('over').hidden = true; $('menu').hidden = false; state = 'menu'; });
+  $('again').addEventListener('click', start);
+
+  // ---------- update ----------
+  function update(dt) {
+    if (state === 'play') {
+      // tempo eases toward the mode's target; hard mode surges in bursts after 150
+      curBpm += (targetBpm() - curBpm) * Math.min(1, dt * 2);
+      scroll += rowsPerSec() * dt;
+      musicTick();
+      while (nextRow < scroll + 14) genRow();
+      for (const t of tiles) {
+        if (t.holding) {
+          // a note every eighth beat, sounding for half of it, rest for the other half
+          const now = performance.now() / 1000, gap = 60 / bpm() / 2;
+          if (now >= t.nextPulse) {
+            const n = songNote(t.row + t.pulseIx);
+            laneTone(t.lane, N(n), gap * 0.5);
+            t.pulseIx++; t.nextPulse = now + gap;
+          }
+          const total = t.len - 0.6;
+          t.progress = Math.min(1, (scroll - t.holdStart) / total);
+          if (t.progress >= 1 && !t.done) {
+            t.done = true; t.holding = null; if (t.sound) { t.sound.stop(); t.sound = null; }
+            score += t.len - 1; popups.push({ x: t.lane * laneW + laneW / 2, y: H * 0.6, t: 0, txt: 'PERFECT +' + (t.len - 1) });
+            tone(N(88), 0.08, 'square', 0.05);
+          }
+        }
+        if (!t.hit && tileBottom(t) > H + 2) {
+          // roll back so the missed tile is visible
+          scroll -= (tileBottom(t) - H + rowH * 0.2) / rowH;
+          return fail('A tile slipped past you.', t.lane, H - rowH / 2, t);
+        }
+      }
+      tiles = tiles.filter(t => tileTop(t) < H + rowH);
+    }
+    if (failInfo) failInfo.t += dt;
+    music.pulse = Math.max(0, music.pulse - dt * 4);
+    for (const p of popups) p.t += dt;
+    popups = popups.filter(p => p.t < 0.6);
+  }
+
+  // ---------- draw ----------
+  function px(n) { return Math.round(n); }
+  function draw() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
+    // beat pulse on the lane floor
+    const pulse = music.pulse;
+    for (let i = 0; i < LANES; i++) {
+      ctx.fillStyle = LANE_COL[i][2]; ctx.globalAlpha = 0.06 + pulse * 0.10;
+      ctx.fillRect(px(i * laneW), 0, px(laneW), H);
+    }
+    ctx.globalAlpha = 1;
+    // hit line glow near the bottom
+    ctx.fillStyle = C.lane; ctx.fillRect(0, H - 3, W, 3);
+    // dotted lane lines that scroll
+    ctx.fillStyle = C.lane;
+    const off = (scroll * rowH) % 8;
+    for (let i = 1; i < LANES; i++) for (let y = -8 + off; y < H; y += 8) ctx.fillRect(px(i * laneW) - 1, px(y), 2, 4);
+
+    for (const t of tiles) {
+      const x = px(t.lane * laneW) + 3, w = px(laneW) - 6;
+      const top = px(tileTop(t)) + 2, bot = px(tileBottom(t)) - 2, h = bot - top;
+      if (bot < 0 || top > H) continue;
+      const [body, hi, sh] = LANE_COL[t.lane];
+      const isFail = failInfo && failInfo.tile === t;
+      if (t.hit && t.len === 1) {
+        const k = Math.min(1, (performance.now() - t.hitAt) / 160);
+        ctx.fillStyle = C.hit; ctx.fillRect(x, top, w, h);
+        ctx.fillStyle = hi; ctx.globalAlpha = 1 - k;
+        ctx.fillRect(x - 4 * k, top - 4 * k, w + 8 * k, h + 8 * k);
+        ctx.globalAlpha = 1;
+        continue;
+      }
+      ctx.fillStyle = isFail ? (Math.floor(failInfo.t * 8) % 2 === 0 ? C.miss : C.ink) : body;
+      ctx.fillRect(x, top, w, h);
+      if (!isFail) {
+        ctx.fillStyle = hi; ctx.fillRect(x, top, w, 4); ctx.fillRect(x, top, 4, h);
+        ctx.fillStyle = sh; ctx.fillRect(x, bot - 4, w, 4); ctx.fillRect(x + w - 4, top, 4, h);
+      }
+      if (t.len > 1) {
+        // long tile: a rail and a fill that climbs while you hold
+        ctx.fillStyle = sh; ctx.fillRect(x + w / 2 - 3, top + 12, 6, h - 24);
+        if (t.hit) {
+          const fh = (h - 8) * (t.progress || 0);
+          ctx.fillStyle = hi; ctx.fillRect(x + 6, bot - 4 - fh, w - 12, fh);
+          ctx.fillStyle = C.ink; ctx.fillRect(x + w / 2 - 8, bot - 4 - fh - 8, 16, 8);
+        }
+        ctx.fillStyle = C.ink;
+        for (let i = 0; i < 3; i++) ctx.fillRect(x + w / 2 - 6 + i * 4, top + 6 + (2 - Math.abs(i - 1)) * 2, 4, 4);
+      }
+      if (t.start && state === 'ready') {
+        ctx.fillStyle = C.bg; ctx.font = `${Math.max(10, Math.min(14, laneW / 7))}px "Press Start 2P", monospace`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        if (Math.floor(performance.now() / 500) % 2 === 0) ctx.fillText('TAP', x + w / 2, (top + bot) / 2);
+      }
+    }
+    // missed blank square
+    if (failInfo && !failInfo.tile && Math.floor(failInfo.t * 8) % 2 === 0) {
+      const ry = Math.floor((failInfo.y - yTop(0)) / rowH);
+      const top = yTop(0) + ry * rowH;
+      ctx.fillStyle = C.miss; ctx.fillRect(px(failInfo.lane * laneW) + 3, px(top) + 2, px(laneW) - 6, px(rowH) - 4);
+    }
+
+    // HUD
+    if (state !== 'menu') {
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.font = '28px "Press Start 2P", monospace';
+      ctx.fillStyle = '#ff4fa3'; ctx.fillText(score, W / 2 + 3, 17);
+      ctx.fillStyle = C.yellow; ctx.fillText(score, W / 2, 14);
+      ctx.font = '9px "Press Start 2P", monospace'; ctx.fillStyle = C.dim;
+      ctx.textAlign = 'right'; ctx.fillText(Math.round(curBpm) + ' BPM', W - 10, 14);
+      ctx.textAlign = 'left'; ctx.fillText(MODES[mode].label + ' ' + best, 10, 14);
+      for (const p of popups) {
+        ctx.globalAlpha = 1 - p.t / 0.6; ctx.textAlign = 'center';
+        ctx.fillStyle = C.ink; ctx.fillText(p.txt, p.x, p.y - p.t * 40);
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  let last = performance.now();
+  function loop(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    update(dt); draw();
+    requestAnimationFrame(loop);
+  }
+  resize(); reset(); state = 'menu';
+  (document.fonts && document.fonts.load ? document.fonts.load('14px "Press Start 2P"') : Promise.resolve()).catch(() => {}).then(() => requestAnimationFrame(loop));
+})();
+</script>
+
+</body>
+</html>
